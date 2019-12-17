@@ -5,13 +5,14 @@
 
 // Zumo speeds, maximum allowed is 400
 #define ZUMO_FAST        100
-#define ZUMO_SLOW        50
+#define ZUMO_SLOW        75
 #define X_CENTER         (pixy.frameWidth/2)
 #define res              (pixy.line.getMainFeatures())
-#define leftMotor        200
-#define rightMotor       200
-String direc;
+#define leftMotor        100
+#define rightMotor       75
+String direc = "None";
 int counter = 0;
+bool wait;
 
 Pixy2 pixy;
 ZumoMotors motors;
@@ -38,7 +39,6 @@ void setup()
   pixy.setServos(550, 800);
 
   pixy.line.setMode(LINE_MODE_TURN_DELAYED);
-
 }
 
 void loop()
@@ -49,49 +49,55 @@ void loop()
   char buf[96];
   bool x;
 
+  if (pixy.line.vectors->m_flags&LINE_FLAG_INTERSECTION_PRESENT)
+  {
+    Serial.println("At intersection.    Direction: " + direc);
+    delay(150);
+    motors.setLeftSpeed(0);
+    motors.setRightSpeed(0);
+  }
+
   if (res & LINE_BARCODE) // If Pixy sees a barcode, it will start to turn left or right
   {
-    Serial.println("I see a barcode");
+    Serial.println("I see a barcode:");
     if (pixy.line.barcodes->m_code == 5) // Checks to see if its the barcode associated with a right turn
     {
       direc = "right";
-      Serial.println("I see barcode 5");
+      Serial.println(" 5.   Turning " + direc);
       motors.setLeftSpeed(leftMotor);
       motors.setRightSpeed(-rightMotor);
-      Serial.println("Turning " + direc);
       delay(50);
     }
     if (pixy.line.barcodes->m_code == 0) // Checks to see if its the barcode associated with a left turn
     {
       direc = "left";
-      Serial.println("I see barcode 0");
+      Serial.println(" 5.   Turning " + direc);
       motors.setLeftSpeed(-leftMotor);
       motors.setRightSpeed(rightMotor);
-      Serial.println("Turning " + direc);
       delay(50);
     }
   }
 
   if (res <= 0) // If Pixy sees nothing, it will stop. If it was in the process of turning it will continue turning in that direction
   {
+    Serial.print("I see nothing.");
     if (direc == "right") // Checks string to see if it previously was in the process of turning right
     {
-      Serial.println("Still turning right");
+      Serial.println("    Direction: " + direc + "    Continuing turn");
       motors.setLeftSpeed(leftMotor);
       motors.setRightSpeed(-rightMotor);
     }
     if (direc == "left") // Checks string to see if it was previously in the process of turning left
     {
-      Serial.println("Still turning left");
+      Serial.println("    Direction: " + direc + "    Continuing turn");
       motors.setLeftSpeed(leftMotor);
       motors.setRightSpeed(-rightMotor);
     }
-    if (direc == "") // Checks if string is empty, which means that Pixy was not previously turning
+    if (direc == "None") // Checks if string is empty, which means that Pixy was not previously turning
     {
       motors.setLeftSpeed(0);
       motors.setRightSpeed(0);
-      Serial.print("stop ");
-      Serial.println(res);
+      Serial.println("    Direction: " + direc + "    Stopping");
     }
   }
 
@@ -102,53 +108,50 @@ void loop()
     headingLoop.update(error);
     left = headingLoop.m_command;
     right = -headingLoop.m_command;
+    motors.setLeftSpeed(right);
+    motors.setRightSpeed(left); 
+    
+    Serial.print("I see a line.");
 
-    Serial.println("I see a vector.");
+    if (direc == "right") //&& pixy.line.vectors->m_x0 > pixy.line.vectors->m_x1); // Checks if it was previously turning right
+    {
+      motors.setLeftSpeed(0);
+      motors.setRightSpeed(0);
+      direc = "None";
+      Serial.println("    Direction: " + direc + "    Finishing turn") ;
+      counter == 0;
+      delay(500);
+    }
 
-    if (direc == "left" || "right"); // Checks if it was previously turning
+    if (direc == "left") //&& pixy.line.vectors->m_x0 < pixy.line.vectors->m_x1); // Checks if it was previously turning left
     {
-      if (pixy.line.vectors->m_x0 > pixy.line.vectors->m_x1) // If it was turning, it stops the motors since Pixy detected a new line and resets string variable
-      {
-        motors.setLeftSpeed(0);
-        motors.setRightSpeed(0);
-        direc = "";
-        counter == 0;
-        Serial.println("DONE");
-      }
+      motors.setLeftSpeed(0);
+      motors.setRightSpeed(0);
+      direc = "None";
+      counter == 0;
+      Serial.println("    Direction: " + direc + "    Finishing turn") ;
+      delay(500);
     }
-//problem here, maybe check direction to be empty so it doesn't get confused. Needs to stop every 3 intersections
-    if (pixy.line.vectors->m_y0 > pixy.line.vectors->m_y1) // Checks if vector is pointing upwards
+
+    if (direc == "None") //&& pixy.line.vectors->m_y0 > pixy.line.vectors->m_y1) // Checks if it was previously going foward
     {
-      if (res & LINE_INTERSECTION) // Checks for and counts intersections
-      {
-        counter++;
-        Serial.println(counter);
-        if (counter == 3) // Stops only on the third intersection
-        {
-          delay(250);
-          motors.setLeftSpeed(0);
-          motors.setRightSpeed(0);
-          counter == 0;
-          Serial.println(counter);
-          return;
-        }
-      }
-      else // Continue forward
-      {
-        left += ZUMO_FAST;
-        right += ZUMO_FAST;
-      }
+      Serial.println("    Direction: " + direc + "    Continuing Forward");
+      motors.setLeftSpeed(ZUMO_FAST);
+      motors.setRightSpeed(ZUMO_FAST);
     }
-    else  // If the vector is pointing down, Pixy goes backwards
-    {
-      left -= ZUMO_SLOW;
-      right -= ZUMO_SLOW;
-    }
-    motors.setLeftSpeed(left);
-    motors.setRightSpeed(right);
   }
-
-
-
-
 }
+
+
+/*void waitForCommand()
+{
+  while (wait)
+  {
+    Serial.println("Waiting");
+    if (res & LINE_BARCODE)
+    {
+      wait = false;
+      return;
+    }
+  }
+}*/
