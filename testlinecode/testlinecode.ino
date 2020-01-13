@@ -3,15 +3,12 @@
 #include <ZumoMotors.h>
 #include <ZumoBuzzer.h>
 
+// Zumo speeds, maximum allowed is 400
 #define ZUMO_FAST        200
 #define ZUMO_SLOW        150
 #define X_CENTER         (pixy.frameWidth/2)
-//#define res              (pixy.line.getMainFeatures())
-#define leftMotor        100
-#define rightMotor       75
-String direc = "None";
-int counter = 0;
-bool wait;
+int intrsectcounter = 0;
+int instruct = 1;
 
 Pixy2 pixy;
 ZumoMotors motors;
@@ -22,6 +19,7 @@ PIDLoop headingLoop(5000, 0, 0, false);
 void setup()
 {
   Serial.begin(115200);
+  
   Serial.print("Starting...\n");
   motors.setLeftSpeed(0);
   motors.setRightSpeed(0);
@@ -35,61 +33,154 @@ void setup()
   pixy.changeProg("line");
 
   // look straight and down
-  pixy.setServos(550, 800);
-
-  pixy.line.setMode(LINE_MODE_TURN_DELAYED);
+  pixy.setServos(500, 850);
+  pixy.line.setDefaultTurn(-90);
 }
 
-void loop()
-{
+
+void loop() {
   int8_t res;
   int32_t error;
   int left, right;
   char buf[96];
-  bool x;
-  pixy.line.getMainFeatures();
 
-  if (res&LINE_VECTOR) // If Pixy sees a line, it will correct itself, track, and follow that line. If it was previously turning, it will stop at the line and continue foward.
+
+  // Get latest data from Pixy, including main vector, new intersections and new barcodes.
+  res = pixy.line.getMainFeatures();
+
+  if (res <= 0)
+  {
+    motors.setLeftSpeed(0);
+    motors.setRightSpeed(0);
+    Serial.print("I see nothing. ");
+    Serial.println(res);
+    return;
+  }
+
+  if (res & LINE_VECTOR) // Follows a line and corrects itself as neccessary.
   {
     error = (int32_t)pixy.line.vectors->m_x1 - (int32_t)X_CENTER;
     pixy.line.vectors->print();
     headingLoop.update(error);
     left = headingLoop.m_command;
     right = -headingLoop.m_command;
-    motors.setLeftSpeed(right);
-    motors.setRightSpeed(left);
 
-    Serial.print("I see a line.");
-    if (pixy.line.vectors->m_y0 > pixy.line.vectors->m_y1)
+    Serial.print("Following a line. ");
+    Serial.println(res);
+
+    if (pixy.line.vectors->m_y0 > pixy.line.vectors->m_y1) // Cehcks if y-coord of head is less than tail, which means vector is pointing forward.
     {
-      if (direc == "right") //&& pixy.line.vectors->m_x0 > pixy.line.vectors->m_x1); // Checks if it was previously turning right
+      if (pixy.line.vectors->m_flags & LINE_FLAG_INTERSECTION_PRESENT) // Slows down when intersection present.
       {
-        motors.setLeftSpeed(0);
-        motors.setRightSpeed(0);
-        direc = "None";
-        Serial.println("    Direction: " + direc + "    Finishing turn") ;
-        counter == 0;
-        delay(500);
+        left += ZUMO_SLOW;
+        right += ZUMO_SLOW;
+        Serial.println("Slowing down for intersection.");
       }
-
-      if (direc == "left") //&& pixy.line.vectors->m_x0 < pixy.line.vectors->m_x1); // Checks if it was previously turning left
+      else // Else continues forward.
       {
-        motors.setLeftSpeed(0);
-        motors.setRightSpeed(0);
-        direc = "None";
-        counter == 0;
-        Serial.println("    Direction: " + direc + "    Finishing turn") ;
-        delay(500);
-      }
-
-      if (direc == "None") //&& pixy.line.vectors->m_y0 > pixy.line.vectors->m_y1) // Checks if it was previously going foward
-      {
-        Serial.println("    Direction: " + direc + "    Continuing Forward");
         left += ZUMO_FAST;
         right += ZUMO_FAST;
-        motors.setLeftSpeed(left);
-        motors.setRightSpeed(right);
       }
     }
+    else  // If the vector is pointing down, or down-ish, we need to go backwards to follow.
+    {
+      left -= ZUMO_SLOW;
+      right -= ZUMO_SLOW;
+      Serial.println("Going backwards.");
+    }
+    motors.setLeftSpeed(left);
+    motors.setRightSpeed(right);
+  }
+
+  if (res & LINE_BARCODE) // Checks for any barcodes.
+  {
+    if (pixy.line.barcodes->m_code == 5) // Checks if detected barcode is barcode 5.
+    {
+      Serial.println("I see a barcode.");
+      delay(600);
+      stopMoving();
+      delay(500);
+      if (instruct == 0) // If instruct variable is 0, turns left.
+      {
+        Serial.println("Turning left");
+        motors.setLeftSpeed(-250);
+        motors.setRightSpeed(250);
+        delay(550);
+        keepTurning(instruct);
+      }
+      if (instruct == 1) // If instruct variable is 1, turns right.
+      {
+        Serial.println("Turning right.");
+        motors.setLeftSpeed(250);
+        motors.setRightSpeed(-250);
+        delay(500);
+        keepTurning(instruct);
+      }
+      if (instruct == 2) // If instruct variable is 2, continues forward.
+      {
+        Serial.println("Continuing straight.");
+        return;
+      }
+    }
+  }
+}
+
+void stopMoving() // Function created to stop motors
+{
+  motors.setLeftSpeed(0);
+  motors.setRightSpeed(0);
+  Serial.println("Stopped motors.");
+}
+
+void keepTurning(int x) // Function meant to override parts of code so robot behaves differently when turning.
+{
+  int8_t res;
+  int direc = x;
+  res = pixy.line.getMainFeatures();
+  
+  while (res <= 0) // While turning, if the Pixy camera sees nothing, robot will continue turning until it sees something (a line).
+  {
+    res = pixy.line.getMainFeatures();
+    Serial.println(res);
+    if(direc == 0) // Checks if previously turning left.
+    {
+      Serial.println("Continuing left turn.");
+      motors.setLeftSpeed(-250);
+      motors.setRightSpeed(250);
+    }
+    if(direc == 1) // Checks if previously turning right.
+    {
+      Serial.println("Continuing right turn.");
+      motors.setLeftSpeed(250);
+      motors.setRightSpeed(-250);
+    }
+  }
+  
+  if (res & LINE_VECTOR) // Robot will turn 90 degrees before it stops.
+  {
+    if (direc == 0) // Checks if previously turning left.
+    {
+      while (pixy.line.vectors->m_x0 > pixy.line.vectors->m_x1) // Continues to turn until tail cordinate of vector is greater than the coordinate for the head.
+      {                                                         // Signifies that robot fully turned 90 degrees.
+        Serial.println("Finishing left turn.");
+        motors.setLeftSpeed(-250);
+        motors.setRightSpeed(250);
+      }
+    }
+    if (direc == 1) // Checks if previously turning left.
+    {
+      while (pixy.line.vectors->m_x0 > pixy.line.vectors->m_x1) // Continues to turn until tail cordinate of vector is less than the coordinate for the head.
+      {                                                         // Signifies that robot fully turned 90 degrees.
+        Serial.println("Finishing right turn.");
+        motors.setLeftSpeed(250);
+        motors.setRightSpeed(-250);
+        //Serial.println(pixy.line.vectors->m_x0);
+        //Serial.println(pixy.line.vectors->m_x1);
+      }
+    }
+    stopMoving();
+    delay(250);
+    Serial.println("Finished.");
+    return;
   }
 }
