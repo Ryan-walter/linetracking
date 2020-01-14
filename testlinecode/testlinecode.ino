@@ -26,7 +26,7 @@ void setup()
 
   pixy.init();
   // Turn on both lamps, upper and lower for maximum exposure
-  pixy.setLamp(1, 1);
+  pixy.setLamp(0, 0);
   // change to the line_tracking program.  Note, changeProg can use partial strings, so for example,
   // you can change to the line_tracking program by calling changeProg("line") instead of the whole
   // string changeProg("line_tracking")
