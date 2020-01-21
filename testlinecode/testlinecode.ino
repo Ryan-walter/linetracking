@@ -26,7 +26,7 @@ void setup()
 
   pixy.init();
   // Turn on both lamps, upper and lower for maximum exposure
-  pixy.setLamp(0, 0);
+  pixy.setLamp(1,1);
   // change to the line_tracking program.  Note, changeProg can use partial strings, so for example,
   // you can change to the line_tracking program by calling changeProg("line") instead of the whole
   // string changeProg("line_tracking")
@@ -97,22 +97,22 @@ void loop() {
     if (pixy.line.barcodes->m_code == 5) // Checks if detected barcode is barcode 5.
     {
       Serial.println("I see a barcode.");
-      delay(600);
+      delay(800);
       stopMoving();
       delay(500);
       if (instruct == 0) // If instruct variable is 0, turns left.
       {
         Serial.println("Turning left");
-        motors.setLeftSpeed(-250);
-        motors.setRightSpeed(250);
+        motors.setLeftSpeed(-175);
+        motors.setRightSpeed(175);
         delay(550);
         keepTurning(instruct);
       }
       if (instruct == 1) // If instruct variable is 1, turns right.
       {
         Serial.println("Turning right.");
-        motors.setLeftSpeed(250);
-        motors.setRightSpeed(-250);
+        motors.setLeftSpeed(175);
+        motors.setRightSpeed(-175);
         delay(500);
         keepTurning(instruct);
       }
@@ -145,14 +145,14 @@ void keepTurning(int x) // Function meant to override parts of code so robot beh
     if(direc == 0) // Checks if previously turning left.
     {
       Serial.println("Continuing left turn.");
-      motors.setLeftSpeed(-250);
-      motors.setRightSpeed(250);
+      motors.setLeftSpeed(-175);
+      motors.setRightSpeed(175);
     }
     if(direc == 1) // Checks if previously turning right.
     {
       Serial.println("Continuing right turn.");
-      motors.setLeftSpeed(250);
-      motors.setRightSpeed(-250);
+      motors.setLeftSpeed(175);
+      motors.setRightSpeed(-175);
     }
   }
   
@@ -163,8 +163,8 @@ void keepTurning(int x) // Function meant to override parts of code so robot beh
       while (pixy.line.vectors->m_x0 > pixy.line.vectors->m_x1) // Continues to turn until tail cordinate of vector is greater than the coordinate for the head.
       {                                                         // Signifies that robot fully turned 90 degrees.
         Serial.println("Finishing left turn.");
-        motors.setLeftSpeed(-250);
-        motors.setRightSpeed(250);
+        motors.setLeftSpeed(-175);
+        motors.setRightSpeed(175);
       }
     }
     if (direc == 1) // Checks if previously turning left.
@@ -172,8 +172,8 @@ void keepTurning(int x) // Function meant to override parts of code so robot beh
       while (pixy.line.vectors->m_x0 > pixy.line.vectors->m_x1) // Continues to turn until tail cordinate of vector is less than the coordinate for the head.
       {                                                         // Signifies that robot fully turned 90 degrees.
         Serial.println("Finishing right turn.");
-        motors.setLeftSpeed(250);
-        motors.setRightSpeed(-250);
+        motors.setLeftSpeed(175);
+        motors.setRightSpeed(-175);
         //Serial.println(pixy.line.vectors->m_x0);
         //Serial.println(pixy.line.vectors->m_x1);
       }
